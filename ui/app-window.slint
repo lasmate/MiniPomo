@@ -4,6 +4,7 @@ export component AppWindow inherits Window {
     in property <int> workTime: 25;
     in property <int> playTime: 25;
     in-out property <int> remainingTime: 0;
+    in-out property <bool> showprogress;
     callback update-workTime(int);
     callback update-playTime(int);
     callback startTimer();
@@ -19,14 +20,19 @@ export component AppWindow inherits Window {
             font-size: 20px;
             font-weight: 500;
             horizontal-alignment: TextHorizontalAlignment.center;
-            vertical-alignment: TextVerticalAlignment.center;
+           
             letter-spacing: 1px;
             ProgressIndicator {
 
-                width: 90%;
-                height: 80%;
+                width: showprogress ? 95% : 0%;
+                height: 85%;
                 opacity: 0.9;
                 progress: remainingTime / 100 ;
+                z: 1;
+                animate width{
+                    duration: 0.5s;easing: ease-out-back;
+                     
+                }
             }}
         HorizontalBox {
             VerticalBox {
@@ -34,6 +40,7 @@ export component AppWindow inherits Window {
                     text: "START";
                     clicked => {
                         startTimer();
+                        root.showprogress=!root.showprogress;
                         debug("Start button clicked");
                     }}}
             VerticalBox {

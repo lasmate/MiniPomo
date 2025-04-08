@@ -1,7 +1,10 @@
 [package]
-name = "slint-rust-template"
-version = "0.1.0"
+name = "MiniPomo"
+version = "0.1.1"
+authors = ["Lya Lasvenes "]
 edition = "2021"
+build = "build.rs"
+description = "A simple Pomodoro timer built with slint and rust with a loading bar animation and custom time split"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,3 +13,7 @@ slint = "1.8.0"
 
 [build-dependencies]
 slint-build = "1.8.0"
+
+[package.metadata.bundle]
+name = "MiniPomo"
+identifier = "io.github.lasmate.MiniPomo"

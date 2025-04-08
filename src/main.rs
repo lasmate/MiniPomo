@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Update timer every 100ms
     timer.start(
         slint::TimerMode::Repeated,
-        std::time::Duration::from_millis(100), 
+        std::time::Duration::from_millis(10), 
         move || {
             let state = *timer_state_clone.lock().unwrap();
             
