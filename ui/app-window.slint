@@ -27,8 +27,7 @@ export component AppWindow inherits Window {
                 height: 80%;
                 opacity: 0.9;
                 progress: remainingTime ;
-            }
-        }
+            }}
         HorizontalBox {
             VerticalBox {
                 Button {
@@ -36,9 +35,7 @@ export component AppWindow inherits Window {
                     clicked => {
                         startTimer();
                         debug("Start button clicked");
-                    }
-                }
-            }
+                    }}}
             VerticalBox {
                 Text {
                     font-size: 18px;
@@ -52,9 +49,7 @@ export component AppWindow inherits Window {
                     value: playTime;
                     edited(playTime) => {
                         update-playTime(playTime);
-                    }
-                }
-            }
+                    }}}
             VerticalBox {
                 Text {
                     font-size: 18px;
@@ -68,10 +63,7 @@ export component AppWindow inherits Window {
                     value: workTime;
                     edited(workTime) => {
                         update-workTime(workTime);
-
-                    }
-                }
-            }
+                    }}}
         }
     }
 }
