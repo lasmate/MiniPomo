@@ -1,15 +1,27 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{error::Error, sync::{Arc, Mutex}};
+use std::{error::Error, sync::{Arc, Mutex}, time::{Duration, Instant}};
+use slint::Timer;
 
 slint::include_modules!();
+
+#[derive(Clone, Copy, PartialEq)]
+enum TimerState {
+    Idle,
+    Working,
+    Playing,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let ui = AppWindow::new()?;
     
-    // Use Arc<Mutex> instead of unsafe globals
+    // Initialize timer state
+    let timer_state = Arc::new(Mutex::new(TimerState::Idle));
+    let start_time = Arc::new(Mutex::new(None::<Instant>));
+    
+    // Initialize work and play times
     let work_time = Arc::new(Mutex::new(25));
-    let play_time = Arc::new(Mutex::new(25));
+    let play_time = Arc::new(Mutex::new(5));
     
     // Work time callback
     let work_time_clone = work_time.clone();
@@ -25,86 +37,113 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Play time updated: {}", time);
     });
 
-    // Timer callback
+    // Initialize timer
     let ui_handle = ui.as_weak();
+    let timer = Timer::default();
+    
+    let timer_state_clone = timer_state.clone();
+    let start_time_clone = start_time.clone();
     let work_time_clone = work_time.clone();
     let play_time_clone = play_time.clone();
+    
+    // Update timer every 100ms
+    timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(100), 
+        move || {
+            let state = *timer_state_clone.lock().unwrap();
+            
+            // If timer is not running, do nothing
+            if state == TimerState::Idle {
+                return;
+            }
+            
+            let Some(start) = *start_time_clone.lock().unwrap() else {
+                return;
+            };
+            
+            let elapsed = start.elapsed();
+            
+            match state {
+                TimerState::Working => {
+                    let work_mins = *work_time_clone.lock().unwrap();
+                    let total_seconds = work_mins * 60;
+                    let elapsed_seconds = elapsed.as_secs() as u32;
+                    
+                    if elapsed_seconds >= total_seconds {
+                        // Work time completed, switch to play time
+                        println!("Work timer completed! Switching to play timer.");
+                        *timer_state_clone.lock().unwrap() = TimerState::Playing;
+                        *start_time_clone.lock().unwrap() = Some(Instant::now());
+                        
+                        if let Some(ui) = ui_handle.upgrade() {
+                            ui.set_remainingTime(100); // Reset progress for play time
+                        }
+                        return;
+                    }
+                    
+                    // Update progress bar
+                    if let Some(ui) = ui_handle.upgrade() {
+                        let remaining = total_seconds - elapsed_seconds;
+                        let progress = (remaining as f32 / total_seconds as f32 * 100.0) as i32;
+                        ui.set_remainingTime(progress);
+                        
+                        // Log progress every second
+                        if elapsed_seconds % 5 == 0 || remaining <= 5 {
+                            println!("Work: {}% ({}s remaining of {}s total)", 
+                                progress, remaining, total_seconds);
+                        }
+                    }
+                },
+                TimerState::Playing => {
+                    let play_mins = *play_time_clone.lock().unwrap();
+                    let total_seconds = play_mins * 60;
+                    let elapsed_seconds = elapsed.as_secs() as u32;
+                    
+                    if elapsed_seconds >= total_seconds {
+                        // Play time completed, reset timer
+                        println!("Play timer completed! Timer reset.");
+                        *timer_state_clone.lock().unwrap() = TimerState::Idle;
+                        *start_time_clone.lock().unwrap() = None;
+                        
+                        if let Some(ui) = ui_handle.upgrade() {
+                            ui.set_remainingTime(0); // Reset progress bar
+                        }
+                        return;
+                    }
+                    
+                    // Update progress bar
+                    if let Some(ui) = ui_handle.upgrade() {
+                        let remaining = total_seconds - elapsed_seconds;
+                        let progress = (remaining as f32 / total_seconds as f32 * 100.0) as i32;
+                        ui.set_remainingTime(progress);
+                        
+                        // Log progress every second
+                        if elapsed_seconds % 5 == 0 || remaining <= 5 {
+                            println!("Play: {}% ({}s remaining of {}s total)", 
+                                progress, remaining, total_seconds);
+                        }
+                    }
+                },
+                _ => {}
+            }
+        }
+    );
+
+    // Start timer callback
+    let timer_state_clone = timer_state.clone();
+    let start_time_clone = start_time.clone();
     ui.on_startTimer(move || {
-        let ui_handle = ui_handle.clone();
-        let work_mins = *work_time_clone.lock().unwrap();
-        let play_mins = *play_time_clone.lock().unwrap();
+        let mut state = timer_state_clone.lock().unwrap();
         
-        std::thread::spawn(move || {
-            run_timer(&ui_handle, work_mins, play_mins);
-        });
-        
-        println!("Timer started with Work Time: {}", work_mins);
+        if *state == TimerState::Idle {
+            // Start work timer
+            *state = TimerState::Working;
+            *start_time_clone.lock().unwrap() = Some(Instant::now());
+            println!("Timer started: Work phase");
+        }
     });
     
     ui.run()?;
     Ok(())
-}
-
-fn run_timer(ui_handle: &slint::Weak<AppWindow>, work_mins: u32, play_mins: u32) {
-    let work_seconds = work_mins * 60;
-    let play_seconds = play_mins * 60;
-    let update_ms = 1000; // Update every second for smoother progress
-    
-    // Helper function to update progress
-    let update_progress = |seconds: u32, total: u32| {
-        if let Some(ui) = ui_handle.upgrade() {
-            // Calculate remaining time percentage (0-100)
-            let remaining = total - seconds;
-            let progress = (remaining as f32 / total as f32 * 100.0) as i32;
-            ui.set_remainingTime(progress);
-            println!("Progress: {}% ({}s remaining of {}s total)", progress, remaining, total);
-        } else {
-            return false; // UI dropped
-        }
-        true
-    };
-    
-    // Run work timer
-    if !run_phase(ui_handle, work_seconds, update_ms, update_progress) {
-        return;
-    }
-    println!("Work timer completed!");
-    
-    // Reset for play timer
-    if let Some(ui) = ui_handle.upgrade() {
-        ui.set_remainingTime(100); // Start full for play timer
-    } else {
-        return;
-    }
-    
-    // Run play timer
-    if !run_phase(ui_handle, play_seconds, update_ms, update_progress) {
-        return;
-    }
-    println!("Play timer completed!");
-    
-    // Reset at end
-    if let Some(ui) = ui_handle.upgrade() {
-        ui.set_remainingTime(0);
-    }
-}
-
-fn run_phase<F>(ui_handle: &slint::Weak<AppWindow>, total_seconds: u32, update_ms: u64, mut update_fn: F) -> bool 
-where F: FnMut(u32, u32) -> bool {
-    let mut elapsed = 0;
-    
-    // Initial update to show full progress bar
-    if !update_fn(0, total_seconds) {
-        return false;
-    }
-    
-    while elapsed < total_seconds {
-        std::thread::sleep(std::time::Duration::from_millis(update_ms));
-        elapsed += update_ms as u32 / 1000;
-        
-        if !update_fn(elapsed, total_seconds) {
-            return false; // UI was dropped
-        }
-    }
-    true
 }
