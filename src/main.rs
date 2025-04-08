@@ -30,8 +30,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Additional logic for play time handling can be added here
     });
 
+    let ui_handle_start = ui.as_weak();
     ui.on_startTimer(move || {
-        let ui_handle_timer = ui.as_weak();
+        let ui_handle_timer = ui_handle_start.clone();
         let work_duration_mins = unsafe { WORK_TIME };
         let play_duration_mins = unsafe { PLAY_TIME };
         let work_total_seconds = work_duration_mins * 60;
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let _timer = std::thread::spawn(move || {
             // Initialize progress to 0
             let ui = ui_handle_timer.upgrade().unwrap();
-            ui.set_remaining_timeChanged(0);
+            ui.set_remainingTime(0);
             
             // Work timer phase
             while elapsed_seconds < work_total_seconds {
@@ -53,8 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // Calculate progress from 0.0 to 1.0
                 let progress = elapsed_seconds as f32 / work_total_seconds as f32;
                 if let Some(ui) = ui_handle_timer.upgrade() {
-                    ui.set_remaining_time((progress * 100.0) as i32);
-                    // Note: isWorkTime property is not defined in your UI file
+                    ui.set_remainingTime((progress ) as i32);
+
                 } else {
                     break; // UI was dropped
                 }
@@ -62,23 +63,23 @@ fn main() -> Result<(), Box<dyn Error>> {
             
             // Work timer completed
             if let Some(ui) = ui_handle_timer.upgrade() {
-                ui.set_remaining_time(100);
+                ui.set_remainingTime(100);
                 println!("Work timer completed!");
                 
                 // Reset for play timer
                 elapsed_seconds = 0;
-                // Note: isWorkTime property is not defined in your UI file
-                ui.set_remaining_time(0);
+
+                ui.set_remainingTime(0);
                 
                 // Play timer phase
                 while elapsed_seconds < play_total_seconds {
                     std::thread::sleep(std::time::Duration::from_millis(update_interval_ms));
-                    elapsed_seconds += update_interval_ms / 1000;
+                    elapsed_seconds += (update_interval_ms / 1000) as u32;
                     
                     // Calculate progress from 0.0 to 1.0
                     let progress = elapsed_seconds as f32 / play_total_seconds as f32;
                     if let Some(ui) = ui_handle_timer.upgrade() {
-                        ui.set_remaining_time((progress * 100.0) as i32);
+                        ui.set_remainingTime((progress * 100.0) as i32);
                     } else {
                         break; // UI was dropped
                     }
@@ -86,20 +87,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 
                 // Play timer completed
                 if let Some(ui) = ui_handle_timer.upgrade() {
-                    ui.set_remaining_time(0);
+                    ui.set_remainingTime(0);
                     println!("Play timer completed!");
                 }
             }
         });
-
         unsafe {
             println!("Timer started with Work Time: {}", WORK_TIME);
-
         }
-
     });
-    
-
     ui.run().map_err(|e| {
         eprintln!("Failed to run the UI: {}", e);
         e
