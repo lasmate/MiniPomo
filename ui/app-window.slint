@@ -1,0 +1,77 @@
+import { Button, VerticalBox, HorizontalBox, SpinBox, ProgressIndicator } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in property <int> workTime: 25;
+    in property <int> playTime: 25;
+    in-out property <int> remainingTime: 0;
+    callback update-workTime(int);
+    callback update-playTime(int);
+    callback startTimer();
+    callback remainingTimeChanged(int);
+    max-width: 400px;
+    max-height: 150px;
+    
+    // Define the window properties
+    title: "Pomodoro Timer";
+    VerticalBox {
+        Text {
+            text: "Pomodoro Timer";
+            font-size: 20px;
+            font-weight: 500;
+            horizontal-alignment: TextHorizontalAlignment.center;
+            vertical-alignment: TextVerticalAlignment.center;
+            letter-spacing: 1px;
+            ProgressIndicator {
+
+                width: 90%;
+                height: 80%;
+                opacity: 0.9;
+                progress: remainingTime / 100;
+            }
+        }
+        HorizontalBox {
+            VerticalBox {
+                Button {
+                    text: "START";
+                    clicked => {
+                        startTimer();
+                        debug("Start button clicked");
+                    }
+                }
+            }
+            VerticalBox {
+                Text {
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-alignment: TextHorizontalAlignment.center;
+                    text: "Play";
+                }
+                SpinBox {
+                    minimum: 0;
+                    maximum: 60;
+                    value: playTime;
+                    edited(playTime) => {
+                        update-playTime(playTime);
+                    }
+                }
+            }
+            VerticalBox {
+                Text {
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-alignment: TextHorizontalAlignment.center;
+                    text: "Work";
+                }
+                SpinBox {
+                    minimum: 0;
+                    maximum: 60;
+                    value: workTime;
+                    edited(workTime) => {
+                        update-workTime(workTime);
+
+                    }
+                }
+            }
+        }
+    }
+}
